@@ -8,9 +8,11 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -20,15 +22,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.hrooms.hroomsservice.Utils.Constants;
 import com.hrooms.hroomsservice.entities.AssignedRooms;
+import com.hrooms.hroomsservice.entities.Audit;
 import com.hrooms.hroomsservice.entities.Provider;
 import com.hrooms.hroomsservice.entities.RoomStatus;
 import com.hrooms.hroomsservice.entities.RoomType;
 import com.hrooms.hroomsservice.entities.Rooms;
 import com.hrooms.hroomsservice.modal.AssignedRoomsVO;
+import com.hrooms.hroomsservice.modal.AuditVO;
 import com.hrooms.hroomsservice.modal.FilterVO;
 import com.hrooms.hroomsservice.modal.OptionsVO;
 import com.hrooms.hroomsservice.modal.RoomsVO;
 import com.hrooms.hroomsservice.repository.AssignedRoomsRepository;
+import com.hrooms.hroomsservice.repository.AuditRepository;
 import com.hrooms.hroomsservice.repository.ProviderRepository;
 import com.hrooms.hroomsservice.repository.RoomStatusRepository;
 import com.hrooms.hroomsservice.repository.RoomTypeRepository;
@@ -46,18 +51,20 @@ public class RoomServiceImpl implements RoomService {
 	ProviderRepository providerRepo;
 	@Autowired
 	AssignedRoomsRepository assignedRoomRepo;
+	@Autowired
+	AuditRepository auditRepo;
 
 	public static Map<Integer, String> weeks;
 
 	private final String AM = "AM";
-	private final String NOON = "Noon";
+	private final String NOON = "Afternoon";
 	private final String EVENING = "Evening";
 
 	static {
 		weeks = new HashMap<Integer, String>() {
 			{
 				put(1, "Sun");
-				put(2, "Mon");
+				put(2, "Mun");
 				put(3, "Tue");
 				put(4, "Wed");
 				put(5, "Thu");
@@ -70,8 +77,13 @@ public class RoomServiceImpl implements RoomService {
 	@Override
 	public List<OptionsVO> getAllRooms() {
 		List<OptionsVO> returnVOs = new ArrayList<OptionsVO>();
-		List<Rooms> rooms = roomRepository.findAll();
+		List<Rooms> rooms = roomRepository.findAllOrderByName();
+		Set<String> roomNames = new HashSet<>();
 		for (Rooms room : rooms) {
+			if (roomNames.contains(room.getName())) {
+				continue;
+			}
+			roomNames.add(room.getName());
 			OptionsVO roomsVO = new OptionsVO();
 			roomsVO.setValue(room.getId());
 			roomsVO.setLabel(room.getName());
@@ -91,7 +103,12 @@ public class RoomServiceImpl implements RoomService {
 		} else {
 			rooms = roomRepository.findAll();
 		}
+		Set<String> roomNames = new HashSet<>();
 		for (Rooms room : rooms) {
+			if (roomNames.contains(room.getName())) {
+				continue;
+			}
+			roomNames.add(room.getName());
 			RoomsVO roomsVO = new RoomsVO();
 			roomsVO.setValue(room.getId());
 			roomsVO.setLabel(room.getName());
@@ -139,6 +156,17 @@ public class RoomServiceImpl implements RoomService {
 		return returnVOs;
 	}
 
+	private Set<String> getRoomNamesByFilter(List<Integer> roomIds) {
+		Set<String> roomNames = new HashSet<>();
+		if (roomIds != null && !roomIds.isEmpty()) {
+			List<Rooms> rooms = roomRepository.findByIdIn(roomIds);
+			for (Rooms room : rooms) {
+				roomNames.add(room.getName());
+			}
+		}
+		return roomNames;
+	}
+
 	@Override
 	public List<AssignedRoomsVO> getAllAssignedRooms(FilterVO filters) {
 
@@ -146,6 +174,8 @@ public class RoomServiceImpl implements RoomService {
 
 		Map<String, Integer> roomStatusMap = roomStatusRepo.findAll().stream()
 				.collect(Collectors.toMap(RoomStatus::getStatus, RoomStatus::getId));
+
+		Set<String> roomNames = getRoomNamesByFilter(filters.getRooms());
 
 		Comparator<AssignedRooms> assignedRoomsComparator = Comparator.comparing(AssignedRooms::getSession)
 				.thenComparing(r -> r.getProvider().getId()).thenComparing(AssignedRooms::getFromDate);
@@ -187,8 +217,8 @@ public class RoomServiceImpl implements RoomService {
 					continue;
 				}
 			}
-			if (!filters.getRooms().isEmpty()) {
-				if (!filters.getRooms().contains(room.getId())) {
+			if (!roomNames.isEmpty()) {
+				if (!roomNames.contains(room.getName())) {
 					continue;
 				}
 			}
@@ -405,12 +435,12 @@ public class RoomServiceImpl implements RoomService {
 	private void checAndAddToList(List<AssignedRoomsVO> returnList, AssignedRoomsVO roomVO, FilterVO filters,
 			Map<String, Integer> roomStatusMap) {
 		boolean add = true;
-		if (!filters.getSessions().isEmpty()) {
+		if (filters.getSessions() != null && !filters.getSessions().isEmpty()) {
 			if (!filters.getSessions().contains(roomVO.getSession())) {
 				add = false;
 			}
 		}
-		if (!filters.getProviders().isEmpty()) {
+		if (filters.getProviders() != null && !filters.getProviders().isEmpty()) {
 			if (!filters.getProviders().contains(roomVO.getProviderId())) {
 				add = false;
 			}
@@ -432,8 +462,10 @@ public class RoomServiceImpl implements RoomService {
 		roomVO.setEndDate(room.getToDate());
 		roomVO.setRoomName(room.getName());
 		roomVO.setLocation(room.getLocation().getName());
+		roomVO.setLocationId(room.getLocation().getId());
 		roomVO.setStatus(room.getRoomStatus().getStatus());
 		roomVO.setRoomType(room.getRoomType().getType());
+		roomVO.setRoomTypeId(room.getRoomType().getId());
 		roomVO.setSession(session);
 		return roomVO;
 	}
@@ -445,8 +477,10 @@ public class RoomServiceImpl implements RoomService {
 		roomVO.setEndDate(fromDate);
 		roomVO.setRoomName(room.getName());
 		roomVO.setLocation(room.getLocation().getName());
+		roomVO.setLocationId(room.getLocation().getId());
 		roomVO.setStatus(room.getRoomStatus().getStatus());
 		roomVO.setRoomType(room.getRoomType().getType());
+		roomVO.setRoomTypeId(room.getRoomType().getId());
 		roomVO.setSession(session);
 		return roomVO;
 	}
@@ -457,8 +491,10 @@ public class RoomServiceImpl implements RoomService {
 		roomVO.setStartDate(fromDate);
 		roomVO.setRoomName(room.getName());
 		roomVO.setLocation(room.getLocation().getName());
+		roomVO.setLocationId(room.getLocation().getId());
 		roomVO.setStatus(room.getRoomStatus().getStatus());
 		roomVO.setRoomType(room.getRoomType().getType());
+		roomVO.setRoomTypeId(room.getRoomType().getId());
 		roomVO.setSession(session);
 		return roomVO;
 	}
@@ -473,8 +509,10 @@ public class RoomServiceImpl implements RoomService {
 		}
 		roomVO.setRoomName(room.getName());
 		roomVO.setLocation(room.getLocation().getName());
+		roomVO.setLocationId(room.getLocation().getId());
 		roomVO.setStatus(Constants.BLOCKED);
 		roomVO.setRoomType(room.getRoomType().getType());
+		roomVO.setRoomTypeId(room.getRoomType().getId());
 		roomVO.setSession(assignRoom.getSession());
 		roomVO.setProvider(assignRoom.getProvider().getName());
 		roomVO.setProviderId(assignRoom.getProvider().getId());
@@ -489,8 +527,10 @@ public class RoomServiceImpl implements RoomService {
 		roomVO.setEndDate(utilDate);
 		roomVO.setRoomName(assignRoom.getRoomName());
 		roomVO.setLocation(assignRoom.getLocation());
+		roomVO.setLocationId(assignRoom.getLocationId());
 		roomVO.setStatus(assignRoom.getStatus());
 		roomVO.setRoomType(assignRoom.getRoomType());
+		roomVO.setRoomTypeId(assignRoom.getRoomTypeId());
 		roomVO.setSession(assignRoom.getSession());
 		roomVO.setProvider(assignRoom.getProvider());
 		roomVO.setProviderId(assignRoom.getProviderId());
@@ -536,10 +576,36 @@ public class RoomServiceImpl implements RoomService {
 			assignedRoomRepo.saveAll(saveAssignedRooms);
 		}
 
+		doAudit(assignedRoomVO);
 		// roomRepository.updateRoomStatusByRoomId(assignedRoomVO.getRoomId(),
 		// roomStatusId);
 
 		return "DONE";
+	}
+
+	private void doAudit(AssignedRoomsVO assignedRoomVO) {
+		String action;
+		StringBuilder comments = new StringBuilder();
+		if (assignedRoomVO.getProviderId() > 0) {
+			action = ("Assign Provider");
+			Provider provider = providerRepo.getById(assignedRoomVO.getProviderId());
+			if (assignedRoomVO.getPrevProvider() != null && !assignedRoomVO.getPrevProvider().isEmpty()) {
+				comments.append("Updated Provider ").append("<strong>[").append(assignedRoomVO.getPrevProvider())
+						.append(" -> ").append(provider.getName()).append("]</strong>");
+			} else { 
+				comments.append("Assigned Provider ").append("<strong>[").append(provider.getName())
+						.append("]</strong>");
+			}
+		} else {
+			action = ("Remove Provider");
+			comments.append("Removed Provider ").append("<strong>[").append(assignedRoomVO.getPrevProvider())
+					.append("]</strong>");
+		}
+		comments.append("<br>");
+		comments.append("Dates: ").append(assignedRoomVO.getStartDateStr()).append(" to ")
+				.append(assignedRoomVO.getEndDateStr());
+		auditRepo.insertAudit(assignedRoomVO.getRoomId(), assignedRoomVO.getLocationId(),
+				new java.util.Date(), assignedRoomVO.getUserId(), action, comments.toString());
 	}
 
 	@Override
@@ -562,6 +628,170 @@ public class RoomServiceImpl implements RoomService {
 			returnVOs.add(optionVO);
 		}
 		return returnVOs;
+	}
+
+	@Override
+	public List<AssignedRoomsVO> getManagedRooms(FilterVO filters) {
+
+		List<Rooms> managedRooms = roomRepository.findAll();
+
+		Set<String> roomNames = getRoomNamesByFilter(filters.getRooms());
+
+		Map<String, Integer> roomStatusMap = roomStatusRepo.findAll().stream()
+				.collect(Collectors.toMap(RoomStatus::getStatus, RoomStatus::getId));
+
+		List<AssignedRoomsVO> returnList = new ArrayList<>();
+		for (Rooms room : managedRooms) {
+
+			if (filters.getStartDate() != null || filters.getEndDate() != null) {
+				if (filters.getStartDate() == null) {
+					filters.setStartDate(filters.getEndDate());
+				}
+				if (filters.getEndDate() == null) {
+					filters.setEndDate(filters.getStartDate());
+				}
+
+				if (filters.getStartDate().getTime() > room.getFromDate().getTime()) {
+					room.setFromDate(filters.getStartDate());
+				}
+				if (room.getToDate() == null
+						|| (room.getToDate() != null && filters.getEndDate().getTime() <= room.getToDate().getTime())) {
+					room.setToDate(filters.getEndDate());
+				}
+
+				if (!(room.getFromDate().getTime() >= filters.getStartDate().getTime()
+						&& room.getFromDate().getTime() <= filters.getEndDate().getTime()))
+
+				{
+					continue;
+				}
+			}
+
+			if (!filters.getRoomTypes().isEmpty()) {
+				if (!filters.getRoomTypes().contains(room.getRoomType().getId())) {
+					continue;
+				}
+			}
+			if (!filters.getLocations().isEmpty()) {
+				if (!filters.getLocations().contains(room.getLocation().getId())) {
+					continue;
+				}
+			}
+			if (!roomNames.isEmpty()) {
+				if (!roomNames.contains(room.getName())) {
+					continue;
+				}
+			}
+
+			AssignedRoomsVO roomVO_AM = null; 
+			if (filters.isShowByDay()) {
+				LocalDate startDate = room.getFromDate().toLocalDate();
+				LocalDate endDate = room.getFromDate().toLocalDate();
+				if (room.getToDate() != null) { 
+					endDate = room.getToDate().toLocalDate();
+				}
+
+				for (LocalDate date = startDate; date.isBefore(endDate)
+						|| date.isEqual(endDate); date = date.plusDays(1)) {
+					java.util.Date utilDate = Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+					roomVO_AM = prepareAssignedRoomVO(room, utilDate, AM);
+
+					checAndAddToList(returnList, roomVO_AM, filters, roomStatusMap);
+				}
+			} else {
+				roomVO_AM = prepareAssignedRoomVO(room, AM);
+				checAndAddToList(returnList, roomVO_AM, filters, roomStatusMap);
+			}
+
+		}
+
+		if (!filters.getWeeks().isEmpty()) {
+			List<AssignedRoomsVO> weekFilterList = new ArrayList<>();
+			for (AssignedRoomsVO assignedRoomsVO : returnList) {
+				LocalDate startDate = assignedRoomsVO.getStartDateSql().toLocalDate();
+				LocalDate endDate = assignedRoomsVO.getEndDateSql().toLocalDate();
+
+				for (LocalDate date = startDate; date.isBefore(endDate)
+						|| date.isEqual(endDate); date = date.plusDays(1)) {
+					java.util.Date utilDate = Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant());
+
+					Calendar calendar = Calendar.getInstance();
+					calendar.setTime(utilDate);
+					if (filters.getWeeks().contains(weeks.get(calendar.get(Calendar.DAY_OF_WEEK)))) {
+						AssignedRoomsVO weekFilterVO = prepareCopy(assignedRoomsVO, utilDate);
+						weekFilterList.add(weekFilterVO);
+					}
+
+				}
+
+			}
+			returnList = new ArrayList<>();
+			returnList.addAll(weekFilterList);
+		}
+
+		if (!returnList.isEmpty()) {
+			Comparator<AssignedRoomsVO> roomsComparator = Comparator.comparing(AssignedRoomsVO::getRoomName)
+					.thenComparing(AssignedRoomsVO::getStartDate).thenComparing(AssignedRoomsVO::getEndDate)
+					.thenComparing(AssignedRoomsVO::getSessionOrder);
+			returnList.sort(roomsComparator);
+		}
+
+		return returnList;
+
+	}
+
+	@Override
+	public List<AuditVO> getAuditDetails(FilterVO filters) {
+		List<Audit> auditDetails = auditRepo.findAll();
+
+		Set<String> roomNames = getRoomNamesByFilter(filters.getRooms());
+
+		List<AuditVO> returnList = new ArrayList<>();
+		for (Audit room : auditDetails) {
+
+			if (filters.getStartDate() != null || filters.getEndDate() != null) {
+				if (filters.getStartDate() == null) {
+					filters.setStartDate(filters.getEndDate());
+				}
+				if (filters.getEndDate() == null) {
+					filters.setEndDate(filters.getStartDate());
+				}
+
+				if (!(room.getDate().getTime() >= filters.getStartDate().getTime()
+						&& room.getDate().getTime() <= filters.getEndDate().getTime()))
+
+				{
+					continue;
+				}
+			}
+			if (!filters.getLocations().isEmpty()) {
+				if (!filters.getLocations().contains(room.getLocation().getId())) {
+					continue;
+				}
+			}
+			if (!roomNames.isEmpty()) {
+				if (!roomNames.contains(room.getRoom().getName())) {
+					continue;
+				}
+			}
+
+			AuditVO auditVO = new AuditVO();
+			auditVO.setRoomName(room.getRoom().getName());
+			auditVO.setLocation(room.getLocation().getName());
+			auditVO.setDate(room.getDate());
+			auditVO.setUser(room.getUser().getName());
+			auditVO.setAction(room.getAction());
+			auditVO.setComments(room.getComments());
+			returnList.add(auditVO);
+
+			if (!returnList.isEmpty()) {
+				Comparator<AuditVO> roomsComparator = Comparator.comparing(AuditVO::getDate).reversed();
+				returnList.sort(roomsComparator);
+			}
+
+		}
+		return returnList;
 	}
 
 }

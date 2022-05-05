@@ -12,6 +12,7 @@ public class AssignedRoomsVO {
 	public int assignRoomId;
 	public String roomName;
 	public String location;
+	public int locationId;
 	public Date startDate;
 	public Date endDate;
 	public java.sql.Date startDateSql;
@@ -23,8 +24,11 @@ public class AssignedRoomsVO {
 	public String week;
 	public int providerId;
 	public String provider;
+	public String prevProvider;
 	public String status;
 	public String roomType;
+	public int roomTypeId;
+	public int userId;
 
 	public int getId() {
 		return id;
@@ -166,6 +170,38 @@ public class AssignedRoomsVO {
 		if (endDate != null)
 			return new java.sql.Date(endDate.getTime());
 		return endDateSql;
+	} 
+
+	public String getPrevProvider() {
+		return prevProvider;
+	}
+
+	public void setPrevProvider(String prevProvider) {
+		this.prevProvider = prevProvider;
+	} 
+
+	public int getUserId() {
+		return userId;
+	}
+
+	public void setUserId(int userId) {
+		this.userId = userId;
+	} 
+
+	public int getLocationId() {
+		return locationId;
+	}
+
+	public void setLocationId(int locationId) {
+		this.locationId = locationId;
+	} 
+
+	public int getRoomTypeId() {
+		return roomTypeId;
+	}
+
+	public void setRoomTypeId(int roomTypeId) {
+		this.roomTypeId = roomTypeId;
 	}
 
 	@Override

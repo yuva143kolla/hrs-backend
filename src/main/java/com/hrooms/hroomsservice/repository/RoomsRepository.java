@@ -23,5 +23,10 @@ public interface RoomsRepository extends JpaRepository<Rooms, Long>{
 	@Modifying
 	@Query(nativeQuery = true, value = "update rooms set status= :statusId where id = :roomId")
 	public int updateRoomStatusByRoomId(int roomId, int statusId);
+	
+	@Query(nativeQuery = true, value = "select * from rooms order by name")
+	public List<Rooms> findAllOrderByName();
+	 
+	public List<Rooms> findByIdIn(Collection<Integer> roomIds);
 
 }

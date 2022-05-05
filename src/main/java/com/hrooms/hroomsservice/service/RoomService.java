@@ -2,6 +2,7 @@ package com.hrooms.hroomsservice.service;
 
 import java.util.List;
 
+import com.hrooms.hroomsservice.modal.AuditVO;
 import com.hrooms.hroomsservice.modal.AssignedRoomsVO;
 import com.hrooms.hroomsservice.modal.FilterVO;
 import com.hrooms.hroomsservice.modal.OptionsVO;
@@ -20,7 +21,11 @@ public interface RoomService {
 	
 	public List<AssignedRoomsVO> getAllAssignedRooms(FilterVO filters);
 	
+	public List<AssignedRoomsVO> getManagedRooms(FilterVO filters);
+	
 	public String assignProviderToRoom(AssignedRoomsVO assignedRoomVO);
 
 	public List<OptionsVO> getAvilableProviders(AssignedRoomsVO roomVO);
+	
+	public List<AuditVO> getAuditDetails(FilterVO filters);
 }

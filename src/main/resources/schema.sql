@@ -84,3 +84,21 @@ CREATE TABLE `assigenedrooms` (
   CONSTRAINT `FK_assigenedrooms_1` FOREIGN KEY (`roomId`) REFERENCES `rooms` (`id`),
   CONSTRAINT `FK_assigenedrooms_3` FOREIGN KEY (`provider`) REFERENCES `provider` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=54 DEFAULT CHARSET=latin1 ROW_FORMAT=DYNAMIC; 
+
+DROP TABLE IF EXISTS `audit`;
+CREATE TABLE  `audit` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `room` int(10) unsigned NOT NULL,
+  `location` int(10) unsigned NOT NULL,
+  `date` datetime NOT NULL,
+  `user` int(10) unsigned NOT NULL,
+  `action` varchar(45) NOT NULL,
+  `comments` varchar(250) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `FK_audit_1` (`location`),
+  KEY `FK_audit_2` (`room`),
+  KEY `FK_audit_3` (`user`),
+  CONSTRAINT `FK_audit_1` FOREIGN KEY (`location`) REFERENCES `locations` (`id`),
+  CONSTRAINT `FK_audit_2` FOREIGN KEY (`room`) REFERENCES `rooms` (`id`),
+  CONSTRAINT `FK_audit_3` FOREIGN KEY (`user`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
