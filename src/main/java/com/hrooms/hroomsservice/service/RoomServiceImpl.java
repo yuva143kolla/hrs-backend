@@ -64,7 +64,7 @@ public class RoomServiceImpl implements RoomService {
 		weeks = new HashMap<Integer, String>() {
 			{
 				put(1, "Sun");
-				put(2, "Mun");
+				put(2, "Mon");
 				put(3, "Tue");
 				put(4, "Wed");
 				put(5, "Thu");
